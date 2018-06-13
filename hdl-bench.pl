@@ -158,7 +158,7 @@ for (my $i = 0; $i<@ports_raw; $i++){
 		# Since it's not complete, we have to concatenate elements till the end
 		for (my $j=4; $j<@{$ports_raw[$i]}; $j++){
 			# In case of a vector, some spaces must be added
-			if ($ports_raw[$i][$j] =~ /(upto|downto)/){
+			if ($ports_raw[$i][$j] =~ /^(to|downto)$/){
 				$ports_raw[$i][$j] = " " . $ports_raw[$i][$j] . " ";
 			}
 			# Add
@@ -168,14 +168,43 @@ for (my $i = 0; $i<@ports_raw; $i++){
 	# Remove semicolon if there is one at the end
 	$ports[$i][2] =~ s/;//;
 
-}
+	# Check type to see its size in case of vectors
+	# Find vectors 
+	if ($ports[$i][2] =~ /[0-9]+ (downto|to) [0-9]+/i){
+
+		# Get the slice description
+		my($temp) = $ports[$i][2] =~ /([0-9]+ (downto|to) [0-9]+)/i;
+
+		# Find first element index
+		my($temp1) = $temp =~ /([0-9]+)/;
+		# Remove first index
+		$temp =~ s/([0-9]+)//;
+		# Get second index
+		my($temp2) = $temp =~ /([0-9]+)/;
+
+		# Get the size and store it in $ports[$i][3]
+
+		if ($temp1 > $temp2){
+			$ports[$i][3] = $temp1 - $temp2 + 1;
+		}
+		else {
+			$ports[$i][3] = $temp2 - $temp1 + 1;
+		}
+
+	} else{
+		# We consider that it's not a vector so size is 1
+		$ports[$i][3] = 1;
+	}
+
+} # End port scan
 
 
 ##
 # Ports storage in @ports :
-# $ports[i][0] -> Port Name
-# $ports[i][1] -> Direction
-# $ports[i][2] -> Type
+# $ports[$i][0] -> Port Name
+# $ports[$i][1] -> Direction
+# $ports[$i][2] -> Type
+# $ports[$i][3] -> Number of bits
 ##
 
 ## Detect if the ports of the DUT include clocks
@@ -268,13 +297,26 @@ $architecture_head .= "---------------------------------------------------------
 # Loop over all ports
 for (my $i = 0; $i<@ports; $i++){
 
-	#$architecture_head .= "signal " . $ports[$i][1] . " : " . $ports[$i][4] . ";\n";
+	# Print: signal + portname + : + type
+	# + := + init value (if an input of DUT)
 
-	# Print: signal + portname + : + type + := + init value
+	$architecture_head .= "signal " . $ports[$i][0] . " : " .  $ports[$i][2];
 
-	$architecture_head .= "signal " . $ports[$i][0] . " : " .  $ports[$i][2] . ";";
+	# Check if it's an input
+	if ($ports[$i][1] eq "in"){
+		$architecture_head .= " := ";
+		if ($ports[$i][3] == 1){
+			$architecture_head .= "'0'";
+		} else {
+			$architecture_head .= "(others => '0')";
+		}
+	}
 
-	$architecture_head .= "\n";
+	$architecture_head .= ";\n";
+
+	# MAYBEDO: instead of assigning literals as init values, assign it to constants.
+	# These constants (one for each input of the DUT) can be created in a special file and assigned to literal values there.
+	# This could be an option when generaing the script (as it can be cumbersome if not needed).
 
 } 
 
