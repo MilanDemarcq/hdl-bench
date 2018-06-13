@@ -178,7 +178,41 @@ for (my $i = 0; $i<@ports_raw; $i++){
 # $ports[i][2] -> Type
 ##
 
+## Detect if the ports of the DUT include clocks
+my @clocks;
+my $cpt = 0;
 
+# Loop over all ports to find clocks
+for (my $i = 0; $i<@ports; $i++){
+	# Check if it contains _Clk (case insensitive)
+	if ($ports[$i][0] =~ /_Clk/i){
+		# Also check that it's an input of DUT, not an output
+		if ($ports[$i][1] =~ /in/i){
+
+			$clocks[$cpt] = $ports[$i][0];
+			$cpt++;
+
+		}
+	}
+}
+
+## Detect if the ports contain resets (only looking for active low resets of type reset_n)
+my @resets;
+$cpt = 0;
+
+# Loop over to find resets
+for (my $i = 0; $i<@ports; $i++){
+	# Check if it contains _Clk (case insensitive)
+	if ($ports[$i][0] =~ /reset_n/i){
+		# Also check that it's an input of DUT, not an output
+		if ($ports[$i][1] =~ /in/i){
+
+			$resets[$cpt] = $ports[$i][0];
+			$cpt++;
+
+		}
+	}
+}
 
 ## Create the output testbench file
 
@@ -246,6 +280,47 @@ for (my $i = 0; $i<@ports; $i++){
 
 $architecture_head .= "\n";
 
+## Add constant declarations (if any)
+
+if (@clocks > 0 || @resets>0){
+
+	$architecture_head .= "---------------------------------------------------------------------------------\n";
+	$architecture_head .= "-------------------------- Constant declarations --------------------------------\n";
+	$architecture_head .= "---------------------------------------------------------------------------------\n\n";
+
+}
+
+if (@clocks > 0){
+
+	$architecture_head .= "-- CLOCKS --\n";
+
+	for (my $i = 0; $i<@clocks; $i++){
+		# For each clock, create a constant for its period (NAME_CLK_PERIOD)
+		$architecture_head .= "constant " . $clocks[$i] . "_PERIOD : time := 100 ns; -- 10 MHz\n";
+	}
+
+	$architecture_head .= "\n";
+
+}
+
+if (@resets> 0){
+
+	$architecture_head .= "-- RESETS --\n";
+	$architecture_head .= "constant RESET_TIME : time := 1 ms;\n";
+
+	# MAYBEDO: in case of a single clock, make the default reset time 10 times the clock period.
+	# MAYBEDO: in case of multiple clocks, take the slowest.
+
+	# MAYBEDO: allow for multiple reset times: but will need as many processes as resets, or 
+	# some math on the reset times in a single process.
+	# And is there really an interest ?
+
+	$architecture_head .= "\n";
+
+}
+
+
+
 print $outputfile $architecture_head;
 
 ## Architecture body: from "begin" to "end"
@@ -281,8 +356,57 @@ for (my $i = 0; $i<@ports; $i++){
 
 # MAYBEDO: insert tabs inside port declaration to align elements
 
-
 $architecture_body .= "\t);\n\n";
+
+### Add TB signal generation processes
+
+if (@clocks > 0 || @resets>0){
+
+	$architecture_body .= "---------------------------------------------------------------------------------\n";
+	$architecture_body .= "--------------------- Clock and Reset Generation Processes ----------------------\n";
+	$architecture_body .= "---------------------------------------------------------------------------------\n\n";
+
+}
+
+## Clock generation processes
+if (@clocks > 0){
+
+	$architecture_body .= "-- CLOCK --\n";
+	$architecture_body .= "clock_generation : process(" . join(", ", @clocks) . ")\n";
+	$architecture_body .= "begin\n\n";
+
+	# Loop over the clocks
+	for ($i=0; $i<@clocks; $i++){
+		$architecture_body .= "\t" . $clocks[$i] . " <= not " . $clocks[$i] . " after (" . $clocks[$i] . "_PERIOD / 2);\n";
+	}
+
+	$architecture_body .= "\nend process clock_generation;\n\n";
+
+}
+
+## Reset generation processes
+if (@resets > 0){
+
+	$architecture_body .= "-- RESET --\n";
+	$architecture_body .= "reset_generation : process\n";
+	$architecture_body .= "begin\n\n";
+	# Loop over the resets
+	for ($i=0; $i<@resets; $i++){
+		$architecture_body .= "\t" . $resets[$i] . " <= '0';\n";
+	}
+	$architecture_body .= "\twait for RESET_TIME;\n";
+	for ($i=0; $i<@resets; $i++){
+		$architecture_body .= "\t" . $resets[$i] . " <= '1';\n";
+	}
+	$architecture_body .= "\twait;\n\n";
+
+	$architecture_body .= "end process reset_generation;\n\n";
+
+}
+
+
+
+
 
 
 # Architecture body end
