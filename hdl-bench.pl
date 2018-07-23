@@ -261,11 +261,13 @@ $header .= "--------------------------------------------------------------------
 
 print $outputfile $header;
 
-## Add libraries
+## Add libraries and packages
 
-my $libs = "library IEEE;\n";
+my $libs = "-- IEEE Packages\n";
+$libs .= "library IEEE;\n";
 $libs .= "use IEEE.std_logic_1164.all;\n";
 $libs .= "use IEEE.numeric_std.all;\n\n";
+$libs .= "-- Custom packages\n\n\n";
 
 print $outputfile $libs;
 
@@ -273,7 +275,8 @@ print $outputfile $libs;
 
 my $tbentityname = $entityname . "_TB";
 
-my $tbentity = "entity " . $tbentityname . " is\n";
+my $tbentity = "-- Testbench entity declaration\n";
+$tbentity .= "entity " . $tbentityname . " is\n";
 
 # MAYBEDO: add empty generic declaration
 
@@ -289,38 +292,6 @@ my $tbarchiname = "behavorial";
 ## Architecture "header": from declaration start (architecture xxxx of xxxx is) to begin (not included)
 
 my $architecture_head = "architecture " . $tbarchiname . " of " . $tbentityname . " is\n\n";
-
-$architecture_head .= "---------------------------------------------------------------------------------\n";
-$architecture_head .= "--------------- Signal Declarations for Connections with UUT --------------------\n";
-$architecture_head .= "---------------------------------------------------------------------------------\n\n";
-
-# Loop over all ports
-for (my $i = 0; $i<@ports; $i++){
-
-	# Print: signal + portname + : + type
-	# + := + init value (if an input of DUT)
-
-	$architecture_head .= "signal " . $ports[$i][0] . " : " .  $ports[$i][2];
-
-	# Check if it's an input
-	if ($ports[$i][1] eq "in"){
-		$architecture_head .= " := ";
-		if ($ports[$i][3] == 1){
-			$architecture_head .= "'0'";
-		} else {
-			$architecture_head .= "(others => '0')";
-		}
-	}
-
-	$architecture_head .= ";\n";
-
-	# MAYBEDO: instead of assigning literals as init values, assign it to constants.
-	# These constants (one for each input of the DUT) can be created in a special file and assigned to literal values there.
-	# This could be an option when generaing the script (as it can be cumbersome if not needed).
-
-} 
-
-$architecture_head .= "\n";
 
 ## Add constant declarations (if any)
 
@@ -361,7 +332,47 @@ if (@resets> 0){
 
 }
 
+## Add signal declarations for connections with UUT
 
+$architecture_head .= "---------------------------------------------------------------------------------\n";
+$architecture_head .= "--------------- Signal Declarations for Connections with UUT --------------------\n";
+$architecture_head .= "---------------------------------------------------------------------------------\n\n";
+
+# Loop over all ports
+for (my $i = 0; $i<@ports; $i++){
+
+	# Print: signal + portname + : + type
+	# + := + init value (if an input of DUT)
+
+	$architecture_head .= "signal " . $ports[$i][0] . " : " .  $ports[$i][2];
+
+	# Check if it's an input
+	if ($ports[$i][1] eq "in"){
+		$architecture_head .= " := ";
+		if ($ports[$i][3] == 1){
+			$architecture_head .= "'0'";
+		} else {
+			$architecture_head .= "(others => '0')";
+		}
+	}
+
+	$architecture_head .= ";\n";
+
+	# MAYBEDO: instead of assigning literals as init values, assign it to constants.
+	# These constants (one for each input of the DUT) can be created in a special file and assigned to literal values there.
+	# This could be an option when generaing the script (as it can be cumbersome if not needed).
+
+} 
+
+$architecture_head .= "\n";
+
+## Signal declarations: for TB purpose
+
+$architecture_head .= "---------------------------------------------------------------------------------\n";
+$architecture_head .= "-------------------- Signal Declarations for TB purposes ------------------------\n";
+$architecture_head .= "---------------------------------------------------------------------------------\n\n";
+
+$architecture_head .= "\n";
 
 print $outputfile $architecture_head;
 
@@ -446,12 +457,16 @@ if (@resets > 0){
 
 }
 
+## Testbench STIMULI processes
+
+$architecture_body .= "---------------------------------------------------------------------------------\n";
+$architecture_body .= "-------------------------- Testbench STIMULI processes --------------------------\n";
+$architecture_body .= "---------------------------------------------------------------------------------\n\n";
+
+$architecture_body .= "\n";
 
 
-
-
-
-# Architecture body end
+### Architecture body end
 $architecture_body .= "end " . $tbarchiname . ";\n";
 
 print $outputfile $architecture_body;
